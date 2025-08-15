@@ -1,49 +1,56 @@
-# ask_question.py
-# Description: This script allows a user to ask a question, retrieves
-# relevant text chunks from the ChromaDB database, and uses the Mistral AI API
-# to generate an answer based on the retrieved context.
+# QNA.py
+# CHANGE: Renamed from ask_question.py to reflect its role as a Q&A module.
+# Description: This module contains the core logic for answering questions
+# by querying a ChromaDB database and using the Mistral AI API.
 
 import os
-from dotenv import load_dotenv # <-- Add this line
-
- # <-- Add this line
-
+from dotenv import load_dotenv
 import chromadb
 from sentence_transformers import SentenceTransformer
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
+
+# --- 1. Initialization (Moved to top level) ---
+# CHANGE: This code now runs only ONCE when the module is first imported by main.py,
+# which is much more efficient than initializing on every API call.
 
 load_dotenv()
 
 # --- Configuration ---
 DB_DIRECTORY = "agri_db"
 COLLECTION_NAME = "agriculture_docs"
-MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY") # Recommended: Set as environment variable
-# If not using an environment variable, uncomment and paste your key here:
-# MISTRAL_API_KEY = "YOUR_MISTRAL_API_KEY" 
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 
-# --- 1. Initialization ---
-def initialize_components():
-    """Initializes and returns all necessary components."""
-    if not MISTRAL_API_KEY:
-        raise ValueError("MISTRAL_API_KEY is not set. Please set it as an environment variable or in the script.")
+if not MISTRAL_API_KEY:
+    raise ValueError("MISTRAL_API_KEY is not set. Please check your .env file.")
 
-    print("Loading embedding model...")
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-    
-    print("Connecting to ChromaDB...")
-    client = chromadb.PersistentClient(path=DB_DIRECTORY)
-    collection = client.get_collection(name=COLLECTION_NAME)
-    
-    print("Initializing Mistral client...")
-    mistral_client = MistralClient(api_key=MISTRAL_API_KEY)
-    
-    print("Initialization complete. Ready to ask questions.")
-    return embedding_model, collection, mistral_client
+print("Initializing Q&A components...")
 
-# --- 2. Core RAG Logic ---
-def retrieve_context(query, collection, embedding_model, n_results=5):
-    """Retrieves relevant context from the database based on the query."""
+# Initialize all components and store them as global variables within this module
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+db_client = chromadb.PersistentClient(path=DB_DIRECTORY)
+collection = db_client.get_collection(name=COLLECTION_NAME)
+mistral_client = MistralClient(api_key=MISTRAL_API_KEY)
+
+print("Q&A components initialized successfully.")
+
+# --- 2. Core RAG Logic (Combined into a single function) ---
+# CHANGE: Combined the logic into one main function that your FastAPI server can call.
+
+def get_answer_from_books(query: str, n_results: int = 5):
+    """
+    Takes a user query, retrieves context from ChromaDB, and generates an answer using Mistral.
+    
+    Args:
+        query (str): The user's question.
+        n_results (int): The number of context chunks to retrieve.
+
+    Returns:
+        tuple[str, list[str]]: A tuple containing the generated answer and the list of source documents.
+    """
+    print(f"Retrieving context for query: '{query}'")
+    
+    # Step 1: Retrieve context from the database
     query_embedding = embedding_model.encode([query])[0].tolist()
     
     results = collection.query(
@@ -51,12 +58,10 @@ def retrieve_context(query, collection, embedding_model, n_results=5):
         n_results=n_results
     )
     
-    return results['documents'][0]
-
-def generate_answer(query, context, mistral_client):
-    """Generates an answer using Mistral AI based on the query and context."""
+    context = results['documents'][0]
     
-    # Constructing the prompt
+    # Step 2: Generate an answer using the context
+    print("Generating answer with Mistral AI...")
     prompt = f"""
     You are an expert agricultural assistant. Based on the following context extracted from reference books, please provide a clear and concise answer to the user's question. If the context does not contain the answer, state that the information is not available in the provided documents.
 
@@ -75,24 +80,22 @@ def generate_answer(query, context, mistral_client):
         ChatMessage(role="user", content=prompt)
     ]
     
-    print("\nSending request to Mistral AI...")
     chat_response = mistral_client.chat(
-        model="mistral-large-latest", # Or another suitable model like 'mistral-small'
+        model="mistral-large-latest",
         messages=messages
     )
     
-    return chat_response.choices[0].message.content
+    answer = chat_response.choices[0].message.content
+    
+    return answer, context
 
-# --- 3. Main Interaction Loop ---
-def main():
-    """Main function to run the interactive question-answering loop."""
-    try:
-        embedding_model, collection, mistral_client = initialize_components()
-    except Exception as e:
-        print(f"Error during initialization: {e}")
-        return
+# --- 3. Main Interaction Loop (Kept for standalone testing) ---
+# CHANGE: The interactive loop is now inside an `if __name__ == "__main__":` block.
+# This means it will ONLY run if you execute this file directly (e.g., `python QNA.py`).
+# It will NOT run when this file is imported by `main.py`.
 
-    print("\n--- Agricultural RAG Model ---")
+if __name__ == "__main__":
+    print("\n--- Running QNA.py in standalone test mode ---")
     print("Ask a question about your documents. Type 'exit' to quit.")
 
     while True:
@@ -101,22 +104,13 @@ def main():
             print("Exiting. Goodbye!")
             break
         
-        # 1. Retrieve context
-        print("Retrieving relevant information from your books...")
-        retrieved_context = retrieve_context(user_query, collection, embedding_model)
+        # Call the main logic function
+        answer, retrieved_context = get_answer_from_books(user_query)
         
-        # 2. Generate answer
-        answer = generate_answer(user_query, retrieved_context, mistral_client)
-        
-        # 3. Display result
+        # Display result
         print("\n--- Answer ---")
         print(answer)
         print("\n--- Sources ---")
-        # Note: This shows the raw text chunks. For a production system,
-        # you might link back to the source PDF and page number.
         for i, doc in enumerate(retrieved_context):
-             print(f"[{i+1}] {doc[:100]}...") # Print first 100 chars of each source chunk
+            print(f"[{i+1}] {doc[:100]}...")
         print("\n-----------------")
-
-if __name__ == "__main__":
-    main()
