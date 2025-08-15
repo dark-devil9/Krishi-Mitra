@@ -1,0 +1,6 @@
+chromadb
+sentence-transformers
+mistralai
+requests
+PyMuPDF
+beautifulsoup4
