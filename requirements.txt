@@ -1,6 +1,7 @@
-chromadb
-sentence-transformers
-mistralai
-requests
-PyMuPDF
-beautifulsoup4
+chromadb>=0.4.24
+sentence-transformers>=2.2.2
+mistralai==0.1.8
+requests>=2.31.0
+PyMuPDF>=1.23.3
+beautifulsoup4>=4.12.2
+lxml>=4.9.3
