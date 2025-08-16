@@ -1,8 +1,4 @@
-# embed_sources.py
-# Description: This script processes a list of URLs (both PDF and Wikipedia),
-# extracts text, splits it into manageable chunks, generates embeddings,
-# and stores them in a persistent ChromaDB database.
-
+# rag.py
 import os
 import requests
 import fitz  # PyMuPDF
@@ -11,9 +7,9 @@ import chromadb
 from sentence_transformers import SentenceTransformer
 import hashlib
 import io
+import torch # <-- Import torch to check for GPU
 
 # --- Configuration ---
-# ADD YOUR PDF AND WIKIPEDIA URLS HERE
 SOURCE_URLS = [
     "https://sdiopr.s3.ap-south-1.amazonaws.com/2023/June/16-Jun-23-2/2023_IJECC_101437/Revised-ms_IJECC_101437_v1.pdf",
     "https://en.wikipedia.org/wiki/Barahnaja",
@@ -33,148 +29,71 @@ SOURCE_URLS = [
     "https://k8449r.weebly.com/uploads/3/0/7/3/30731055/principles-of-agronomy-agricultural-meteorology-signed.pdf",
     "https://www.iari.res.in/files/Publication/important-publications/ClimateChange.pdf"
 ]
+DB_DIRECTORY = "agri_db"
+COLLECTION_NAME = "agriculture_docs"
 
-
-DB_DIRECTORY = "agri_db"   # Directory to store the ChromaDB database
-COLLECTION_NAME = "agriculture_docs" # Name of the collection in ChromaDB
-
-# --- 1. Data Fetching and Text Extraction ---
-
-def fetch_and_extract_pdf_url(url):
-    """Downloads a PDF from a URL and extracts its text."""
+def fetch_and_extract_text(url):
+    """
+    Fetches and extracts text from a PDF or Wikipedia URL.
+    This combines your two previous functions into one.
+    """
     try:
-        print(f"Fetching PDF from: {url}")
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()  # Raise an exception for bad status codes
-
-        # Open PDF from in-memory bytes
-        pdf_file = io.BytesIO(response.content)
-        doc = fitz.open(stream=pdf_file, filetype="pdf")
-        
-        text = ""
-        for page in doc:
-            text += page.get_text()
-        print(f"Successfully extracted {len(text)} characters.")
-        return text
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching PDF URL {url}: {e}")
-    except Exception as e:
-        print(f"Error processing PDF from {url}: {e}")
-    return None
-
-def fetch_and_extract_wikipedia_url(url):
-    """Fetches and extracts text content from a Wikipedia URL."""
-    try:
-        print(f"Fetching Wikipedia article from: {url}")
         response = requests.get(url, timeout=30)
         response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # Find the main content area of the article
-        content_div = soup.find(id="mw-content-text")
-        if not content_div:
-            print("Could not find main content div.")
-            return None
-            
-        # Extract text from paragraph tags, ignoring tables and other elements
-        paragraphs = content_div.find_all('p')
-        text = "\n".join([p.get_text() for p in paragraphs])
-        
-        print(f"Successfully extracted {len(text)} characters.")
-        return text
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching Wikipedia URL {url}: {e}")
+        if "wikipedia.org" in url:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            content_div = soup.find(id="mw-content-text")
+            return "\n".join(p.get_text() for p in content_div.find_all('p')) if content_div else None
+        elif url.lower().endswith(".pdf"):
+            with fitz.open(stream=io.BytesIO(response.content), filetype="pdf") as doc:
+                return "".join(page.get_text() for page in doc)
     except Exception as e:
-        print(f"Error parsing Wikipedia page {url}: {e}")
+        print(f"Error processing {url}: {e}")
     return None
 
 def chunk_text(text, chunk_size=1000, chunk_overlap=200):
     """Splits text into overlapping chunks."""
-    if not text:
-        return []
+    if not text: return []
     words = text.split()
-    chunks = []
-    for i in range(0, len(words), chunk_size - chunk_overlap):
-        chunks.append(" ".join(words[i:i + chunk_size]))
-    return chunks
+    return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size - chunk_overlap)]
 
-# --- 2. Main Processing Logic ---
 def process_and_embed_sources():
-    """
-    Main function to process all URLs, create embeddings,
-    and store them in ChromaDB.
-    """
-    print("Starting the source processing and embedding script...")
-
-    # Initialize the embedding model
-    print("Loading embedding model...")
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-    print("Embedding model loaded.")
-
-    # Initialize ChromaDB client with persistence
+    """Main function to process URLs, create embeddings, and store in ChromaDB."""
+    print("Starting data ingestion...")
+    
+    # Check for an NVIDIA GPU and set the device for the model.
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device} for embedding...")
+    
+    # Load the embedding model onto the selected device (GPU or CPU).
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2', device=device)
+    
     client = chromadb.PersistentClient(path=DB_DIRECTORY)
+    collection = client.get_or_create_collection(name=COLLECTION_NAME)
 
-    # Get or create the collection
-    collection = client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        metadata={"hnsw:space": "cosine"} # Using cosine similarity
-    )
+    for url in SOURCE_URLS:
+        print(f"\n--- Processing: {url} ---")
+        text = fetch_and_extract_text(url)
+        if not text: continue
 
-    # Process each URL
-    total_urls = len(SOURCE_URLS)
-    print(f"Found {total_urls} URLs to process.")
-
-    for i, url in enumerate(SOURCE_URLS):
-        print(f"\n--- Processing URL {i+1}/{total_urls}: {url} ---")
-        text = None
-        
-        # Determine the type of URL and process accordingly
-        if "wikipedia.org" in url:
-            text = fetch_and_extract_wikipedia_url(url)
-        elif url.lower().endswith(".pdf"):
-            text = fetch_and_extract_pdf_url(url)
-        else:
-            print(f"Skipping unsupported URL type: {url}")
-            continue
-
-        if not text:
-            print("Failed to extract text. Moving to next URL.")
-            continue
-
-        # Chunk text
-        print("Chunking text...")
         chunks = chunk_text(text)
-        if not chunks:
-            print("No text chunks generated for this source.")
-            continue
+        if not chunks: continue
         
-        print(f"Generated {len(chunks)} chunks.")
-
-        # Generate unique IDs for each chunk
+        # Create unique IDs for each chunk to prevent duplicates.
         ids = [f"{url}_{hashlib.md5(chunk.encode()).hexdigest()}" for chunk in chunks]
-
-        # Generate embeddings
-        print("Generating embeddings for chunks...")
+        
+        # This step will be much faster on a GPU.
         embeddings = embedding_model.encode(chunks, show_progress_bar=True)
+        
+        collection.add(
+            embeddings=embeddings.tolist(),
+            documents=chunks,
+            metadatas=[{"source": url} for _ in chunks],
+            ids=ids
+        )
+        print(f"Successfully added {len(chunks)} chunks to the database.")
 
-        # Add to ChromaDB collection
-        print("Adding chunks to the database...")
-        try:
-            collection.add(
-                embeddings=embeddings.tolist(),
-                documents=chunks,
-                metadatas=[{"source": url} for _ in chunks],
-                ids=ids
-            )
-            print(f"Successfully added {len(chunks)} chunks for {url}.")
-        except Exception as e:
-            print(f"Error adding chunks to database for {url}: {e}")
-
-    print("\n-----------------------------------------")
-    print("All sources have been processed and embedded.")
-    print(f"Total documents in collection: {collection.count()}")
-    print("-----------------------------------------")
+    print(f"\n--- Ingestion Complete. Total documents: {collection.count()} ---")
 
 if __name__ == "__main__":
     process_and_embed_sources()
