@@ -4,6 +4,10 @@ import pgeocode
 import re
 import os
 
+from datetime import datetime, timedelta
+from functools import lru_cache
+from rapidfuzz import process, fuzz
+
 
 # Initialize geocoders for India
 geo_pincode = pgeocode.Nominatim('in')
@@ -13,6 +17,22 @@ from dotenv import load_dotenv
 
 # Initialize the geocoder for India. It downloads data on first use.
 geo_pincode = pgeocode.Nominatim('in')
+
+def reverse_geocode(lat: float, lon: float):
+    try:
+        url = f"https://geocoding-api.open-meteo.com/v1/reverse?latitude={lat}&longitude={lon}&language=en&format=json"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        js = r.json()
+        if js.get("results"):
+            res = js["results"][0]
+            district = res.get("admin2") or res.get("name")
+            state = res.get("admin1")
+            return {"district": district, "state": state}
+    except requests.exceptions.RequestException:
+        pass
+    return {"district": None, "state": None}
+
 
 def get_state_from_location(location_name: str):
     """
@@ -76,6 +96,56 @@ def get_coords_for_location(location_query: str):
         
     print(f"Could not find coordinates for '{location_query}'.")
     return None
+
+def get_weather_brief(location_query: str, prob_yes: int = 50, amt_yes_mm: float = 1.0):
+    coords = get_coords_for_location(location_query)
+    if not coords:
+        return "Weather unavailable now."
+    lat, lon = coords["lat"], coords["lon"]
+
+    api = "https://api.open-meteo.com/v1/forecast"
+    daily = "precipitation_sum,precipitation_probability_max,temperature_2m_max,temperature_2m_min"
+    try:
+        r = requests.get(f"{api}?latitude={lat}&longitude={lon}&daily={daily}&timezone=Asia/Kolkata", timeout=12)
+        r.raise_for_status()
+        d = r.json().get("daily", {})
+        times = d.get("time", [])
+        # choose tomorrow if present, else closest next
+        idx = 1 if len(times) > 1 else 0
+
+        pprob = d.get("precipitation_probability_max", [None])[idx]
+        psum = d.get("precipitation_sum", [None])[idx]
+        tmax = d.get("temperature_2m_max", [None])[idx]
+        tmin = d.get("temperature_2m_min", [None])[idx]
+
+        if pprob is None and psum is None:
+            return "Weather unavailable now."
+
+        will_rain = (pprob is not None and pprob >= prob_yes) or (psum is not None and psum >= amt_yes_mm)
+        rain_text = "Yes" if will_rain else "Unlikely"
+        # compose brief
+        parts = [f"{rain_text}—rain chance {pprob}%"] if pprob is not None else [f"{rain_text}"]
+        if psum is not None:
+            parts.append(f"{psum}mm")
+        if tmin is not None and tmax is not None:
+            parts.append(f"temp {tmin}–{tmax}°C")
+        return "; ".join(parts) + "."
+    except requests.exceptions.RequestException:
+        return "Weather unavailable now."
+
+def get_state_and_district(location_query: str):
+    # 1) Try pgeocode (pincode or name)
+    state = get_state_from_location(location_query)  # may be None
+    # 2) If we can geocode coords, try reverse for district/state
+    coords = get_coords_for_location(location_query)
+    if coords:
+        rev = reverse_geocode(coords["lat"], coords["lon"])
+        # prefer reverse_geocode if available
+        state = rev["state"] or state
+        district = rev["district"]
+    else:
+        district = None
+    return {"state": state, "district": district}
 
 
 def get_weather_forecast(location_query: str):
@@ -143,6 +213,113 @@ def get_weather_forecast(location_query: str):
     
 load_dotenv()
 AGMARKNET_API_KEY = os.getenv("AGMARKNET_API_KEY")
+
+AGMARK_RESOURCE = "9ef84268-d588-465a-a308-a864a43d0070"
+AGMARK_API = "https://api.data.gov.in/resource"
+
+@lru_cache(maxsize=1)
+def get_all_commodities(api_key: str):
+    if not api_key:
+        return []
+    try:
+        # Pull a page; many APIs support 'distinct' but data.gov.in does not for this dataset.
+        # Strategy: fetch multiple pages and aggregate; keep it simple with one larger page.
+        params = {"api-key": api_key, "format": "json", "limit": "500"}
+        r = requests.get(f"{AGMARK_API}/{AGMARK_RESOURCE}", params=params, timeout=15)
+        r.raise_for_status()
+        recs = r.json().get("records", [])
+        names = { (rec.get("commodity") or "").strip() for rec in recs if rec.get("commodity") }
+        return sorted(n for n in names if n)
+    except requests.exceptions.RequestException:
+        return []
+
+def fuzzy_match_commodity(text: str, choices: list[str], threshold: int = 85):
+    if not text or not choices:
+        return None
+    cand = process.extractOne(text, choices, scorer=fuzz.WRatio)
+    if cand and cand[1] >= threshold:
+        return cand
+    return None
+
+def _parse_date(ddmmyyyy: str):
+    try:
+        return datetime.strptime(ddmmyyyy, "%d/%m/%Y")
+    except Exception:
+        return datetime.min
+
+def get_market_prices_smart(place_text: str, api_key: str, commodity_text: str | None = None,
+                            recent_days: int = 14, limit: int = 3, fuzzy_thr: int = 85):
+    if not api_key:
+        return "Market prices unavailable now."
+
+    loc = get_state_and_district(place_text)
+    state = loc["state"]
+    district_hint = loc["district"]
+
+    if not state:
+        # still proceed with state-less: will fail fast
+        return "Add a district/state or pincode to fetch mandi prices."
+
+    # commodity fuzzy from live list
+    all_comms = get_all_commodities(api_key)
+    comm_norm = None
+    if commodity_text:
+        comm_norm = fuzzy_match_commodity(commodity_text, all_comms, threshold=fuzzy_thr)
+
+    base = {
+        "api-key": api_key,
+        "format": "json",
+        "limit": "500",
+        "filters[state]": state,
+    }
+    try:
+        # State-first fetch (wider net)
+        r = requests.get(f"{AGMARK_API}/{AGMARK_RESOURCE}", params=base, timeout=18)
+        r.raise_for_status()
+        recs = r.json().get("records", [])
+        if not recs:
+            return f"No recent market price data for {state}."
+
+        # Recent window
+        cutoff = datetime.now() - timedelta(days=recent_days)
+        recs = [x for x in recs if _parse_date(x.get("arrival_date","01/01/1900")) >= cutoff]
+
+        # Commodity filter if present
+        if comm_norm:
+            recs = [x for x in recs if (x.get("commodity") or "").strip().lower() == comm_norm.lower()] or recs
+
+        # Prefer district if we have a hint
+        if district_hint:
+            prefer = [x for x in recs if (x.get("district") or "").strip().lower() == district_hint.strip().lower()]
+            if prefer:
+                recs = prefer
+
+        # Sort by date desc
+        recs.sort(key=lambda x: _parse_date(x.get("arrival_date","01/01/1900")), reverse=True)
+
+        # Build concise top N
+        lines = []
+        seen_pairs = set()
+        for x in recs:
+            c = (x.get("commodity") or "N/A").strip()
+            m = (x.get("market") or "N/A").strip()
+            d = x.get("arrival_date","N/A")
+            price = x.get("modal_price","N/A")
+            key = (c, m)
+            if key in seen_pairs:
+                continue
+            seen_pairs.add(key)
+            lines.append(f"{c}: ₹{price}/qtl at {m} (Date {d})")
+            if len(lines) == limit:
+                break
+        if not lines:
+            return f"No recent market price data for {state}."
+        place_str = f"{district_hint+', ' if district_hint else ''}{state}"
+        return f"Latest modal prices for {place_str}:\n- " + "\n- ".join(lines)
+    except requests.exceptions.RequestException:
+        return "Market prices unavailable now."
+
+
 
 def get_market_prices(district: str):
     """

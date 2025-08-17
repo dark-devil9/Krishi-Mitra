@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Krishi Mitra</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    body { background:#f7faf8; }
+    .app-shell { min-height: 100vh; }
+    .card { border-radius: 12px; }
+    .chat-box { height: 420px; overflow-y:auto; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; }
+    .msg { margin-bottom:10px; }
+    .msg.me { text-align:right; }
+    .msg .bubble { display:inline-block; padding:8px 12px; border-radius:14px; max-width:80%; }
+    .msg.me .bubble { background:#dcfce7; }
+    .msg.bot .bubble { background:#eef2ff; }
+    .small-muted { font-size:12px; color:#6b7280; }
+    .panel-title { font-weight:600; }
+    .split { display:grid; grid-template-columns: 1fr 1.4fr; gap:16px; }
+    @media (max-width: 992px) { .split { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<div class="container py-4 app-shell">
+  <h2 class="mb-3 text-center">🌾 Krishi Mitra</h2>
+
+  <!-- ================= AUTH (client-side) ================= -->
+  <div id="authView" class="row justify-content-center">
+    <div class="col-md-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-3">Login or Sign up</h5>
+          <p class="small-muted mb-3">
+            We’ll create a secure internal <code>user_id</code> for this device and keep it hidden. Your profile is completed via onboarding and stored by your backend through <code>/chat</code>.
+          </p>
+          <form id="authForm" class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input type="email" class="form-control" id="email" placeholder="you@example.com" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-control" id="password" placeholder="••••••••" required />
+            </div>
+            <div class="col-12">
+              <button class="btn btn-primary">Continue</button>
+              <span class="small-muted ms-2">No backend auth endpoints are required—this only creates a local session + hidden user_id.</span>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= ONBOARDING ================= -->
+  <div id="onboardingView" class="row justify-content-center" style="display:none;">
+    <div class="col-lg-9">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-3">Complete your profile</h5>
+          <form id="onboardForm" class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Full Name</label>
+              <input type="text" class="form-control" id="ob_name" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Land Size (acres)</label>
+              <input type="text" class="form-control" id="ob_land" placeholder="e.g., 5 acres or NA" required />
+            </div>
+            <div class="col-12">
+              <label class="form-label">Location (Describe)</label>
+              <textarea class="form-control" id="ob_location" rows="2" placeholder="Village/Town, Tehsil, District, State" required></textarea>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Pincode</label>
+              <input type="text" class="form-control" id="ob_pin" inputmode="numeric" pattern="[0-9]{6}" placeholder="6 digits" required />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">State</label>
+              <input type="text" class="form-control" id="ob_state" required />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">District</label>
+              <input type="text" class="form-control" id="ob_district" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Budget (₹, numbers only)</label>
+              <input type="number" class="form-control" id="ob_budget" placeholder="e.g., 500000" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label d-block">Gender</label>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="ob_gender" id="g_m" value="Male" checked>
+                <label class="form-check-label" for="g_m">Male</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="ob_gender" id="g_f" value="Female">
+                <label class="form-check-label" for="g_f">Female</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="ob_gender" id="g_o" value="Other">
+                <label class="form-check-label" for="g_o">Other</label>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Date of Birth</label>
+              <input type="date" class="form-control" id="ob_dob" required />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Current Crops (optional)</label>
+              <input type="text" class="form-control" id="ob_crops" placeholder="e.g., Wheat, Mustard" />
+            </div>
+            <div class="col-12">
+              <button class="btn btn-success">Save & Continue</button>
+              <span class="small-muted ms-2">This submits your details into your backend’s onboarding stages via <code>/chat</code>.</span>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= DASHBOARD ================= -->
+  <div id="appView" style="display:none;">
+    <div class="split">
+      <!-- Left: Alerts + Suggestions -->
+      <div>
+        <div class="card mb-3 shadow-sm">
+          <div class="card-body">
+            <div class="panel-title mb-2">Alerts</div>
+            <div id="alertsBox" class="vstack gap-2">
+              <div class="text-muted">Loading alerts…</div>
+            </div>
+          </div>
+        </div>
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="panel-title mb-2">Suggestions</div>
+            <div id="suggBox" class="vstack gap-2">
+              <div class="text-muted">Loading suggestions…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Chat -->
+      <div>
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="panel-title">Chatbot</div>
+              <button id="logoutBtn" class="btn btn-outline-secondary btn-sm">Logout</button>
+            </div>
+            <div id="chatBox" class="chat-box mb-2"></div>
+            <form id="chatForm" class="d-flex gap-2">
+              <input id="chatInput" class="form-control" placeholder="Ask anything about agriculture…" />
+              <button class="btn btn-primary">Send</button>
+            </form>
+            <div class="small-muted mt-2">Answers are powered by your backend <code>/ask</code> using your trained RAG.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ================== CONFIG ==================
+  const BACKEND_BASE = "http://127.0.0.1:8000"; // change if needed
+
+  // ================== SESSION / USER ID ==================
+  function getOrCreateUserId() {
+    let uid = localStorage.getItem("km_user_id");
+    if (!uid) {
+      uid = crypto.randomUUID();
+      localStorage.setItem("km_user_id", uid);
+    }
+    return uid;
+  }
+  function clearSession() {
+    localStorage.removeItem("km_user_id");
+    localStorage.removeItem("km_name");
+  }
+
+  let USER_ID = getOrCreateUserId();
+
+  // ================== VIEW HELPERS ==================
+  function show(id, on=true) {
+    document.getElementById(id).style.display = on ? "" : "none";
+  }
+  function toast(msg) { alert(msg); } // simple
+
+  // ================== AUTH (client-side only) ==================
+  document.getElementById("authForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    // Create local session; don’t show user_id
+    USER_ID = getOrCreateUserId();
+    // Check if backend already has profile
+    const st = await fetch(`${BACKEND_BASE}/status?user_id=${encodeURIComponent(USER_ID)}`).then(r=>r.json()).catch(()=>({status:"new_user"}));
+    if (st.status === "profile_complete" || st.status === "completed" || st.status === "profile_complete") {
+      show("authView", false);
+      show("appView", true);
+      initDashboard();
+    } else {
+      show("authView", false);
+      show("onboardingView", true);
+    }
+  });
+
+  // ================== ONBOARDING ==================
+  document.getElementById("onboardForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById("ob_name").value.trim();
+    const land = document.getElementById("ob_land").value.trim();
+    const loc  = document.getElementById("ob_location").value.trim();
+    const pin  = document.getElementById("ob_pin").value.trim();
+    const state= document.getElementById("ob_state").value.trim();
+    const dist = document.getElementById("ob_district").value.trim();
+    const budget = document.getElementById("ob_budget").value.trim();
+    const gender = document.querySelector("input[name='ob_gender']:checked").value;
+    const dob = document.getElementById("ob_dob").value;
+    const crops = document.getElementById("ob_crops").value.trim();
+
+    localStorage.setItem("km_name", name);
+
+    // The backend’s /chat is a stage machine. We drive it in the exact expected order:
+    try {
+      // 1) Start session: first call advances to asking_land_size
+      await fetch(`${BACKEND_BASE}/chat?user_id=${encodeURIComponent(USER_ID)}`, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ message: "start" })
+      });
+
+      // 2) Send location (include pincode, state, district inside the message)
+      const fullLocation = `${loc}, District: ${dist}, State: ${state}, Pincode: ${pin}`;
+      await fetch(`${BACKEND_BASE}/chat?user_id=${encodeURIComponent(USER_ID)}`, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ message: fullLocation })
+      });
+
+      // 3) Land size
+      await fetch(`${BACKEND_BASE}/chat?user_id=${encodeURIComponent(USER_ID)}`, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ message: land })
+      });
+
+      // 4) Budget
+      await fetch(`${BACKEND_BASE}/chat?user_id=${encodeURIComponent(USER_ID)}`, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ message: `${budget} rupees` })
+      });
+
+      // 5) Age + Gender together (backend parses digits for age and finds "female" text)
+      const age = calcAgeFromDOB(dob); // number
+      const ageGenderMsg = `Age: ${age} Gender: ${gender}`;
+      await fetch(`${BACKEND_BASE}/chat?user_id=${encodeURIComponent(USER_ID)}`, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ message: ageGenderMsg })
+      });
+
+      // 6) Current crops
+      await fetch(`${BACKEND_BASE}/chat?user_id=${encodeURIComponent(USER_ID)}`, {
+        method:"POST", headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ message: crops || "Not planned yet" })
+      });
+
+      toast("Profile saved ✅");
+      show("onboardingView", false);
+      show("appView", true);
+      initDashboard();
+    } catch (err) {
+      console.error(err);
+      toast("Failed to complete onboarding.");
+    }
+  });
+
+  function calcAgeFromDOB(dobStr){
+    if (!dobStr) return "NA";
+    const dob = new Date(dobStr);
+    const now = new Date();
+    let age = now.getFullYear() - dob.getFullYear();
+    const m = now.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) age--;
+    return age;
+    }
+
+  // ================== DASHBOARD ==================
+  async function initDashboard(){
+    loadAlerts();
+    loadSuggestions();
+    bootChat();
+  }
+
+  // Alerts
+  async function loadAlerts(){
+    try {
+      const res = await fetch(`${BACKEND_BASE}/alerts?user_id=${encodeURIComponent(USER_ID)}`);
+      const data = await res.json();
+      const box = document.getElementById("alertsBox");
+      box.innerHTML = "";
+      const arr = data?.data || [];
+      if (!arr.length) {
+        box.innerHTML = `<div class="text-muted">No alerts right now.</div>`;
+        return;
+      }
+      arr.forEach(a => {
+        const card = document.createElement("div");
+        card.className = "alert alert-warning";
+        const time = a.timestamp ? `<div class="small-muted">${new Date(a.timestamp).toLocaleString()}</div>` : "";
+        card.innerHTML = `<strong>${a.alert || a.title || "Alert"}</strong><br/>${a.suggestion || a.description || ""}${time}`;
+        box.appendChild(card);
+      });
+    } catch (e) {
+      document.getElementById("alertsBox").innerHTML = `<div class="text-danger">Failed to load alerts.</div>`;
+    }
+  }
+
+  // Suggestions
+  async function loadSuggestions(){
+    const box = document.getElementById("suggBox");
+    box.innerHTML = `<div class="text-muted">Loading…</div>`;
+    try {
+      const res = await fetch(`${BACKEND_BASE}/get-suggestion?user_id=${encodeURIComponent(USER_ID)}`);
+      const data = await res.json();
+      box.innerHTML = "";
+      // Your backend returns { suggestion: "..." } or similar
+      const items = Array.isArray(data?.suggestions) ? data.suggestions : [data?.suggestion].filter(Boolean);
+      if (!items.length) {
+        box.innerHTML = `<div class="text-muted">No suggestions yet.</div>`;
+        return;
+      }
+      items.slice(0,3).forEach((sugg, idx) => {
+        const id = (sugg && (sugg.id || sugg.key)) || crypto.randomUUID();
+        const text = typeof sugg === "string" ? sugg : (sugg.text || sugg.title || sugg.description || JSON.stringify(sugg));
+        const div = document.createElement("div");
+        div.className = "d-flex align-items-start justify-content-between border rounded p-2";
+        div.innerHTML = `
+          <div style="max-width:80%;">${text}</div>
+          <div class="ms-2">
+            <button class="btn btn-sm btn-success me-1" onclick="applySuggestion('${id}')">✔</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="skipSuggestion()">✖</button>
+          </div>`;
+        box.appendChild(div);
+      });
+    } catch (e) {
+      box.innerHTML = `<div class="text-danger">Failed to load suggestions.</div>`;
+    }
+  }
+
+  // Apply suggestion (✔)
+  async function applySuggestion(suggestionId){
+    try {
+      await fetch(`${BACKEND_BASE}/apply-suggestion?user_id=${encodeURIComponent(USER_ID)}&suggestion_id=${encodeURIComponent(suggestionId)}`, { method:"POST" });
+      toast("Marked as applied");
+      // fetch another suggestion
+      loadSuggestions();
+    } catch {
+      toast("Failed to apply suggestion");
+    }
+  }
+
+  // Skip suggestion (✖) — no backend endpoint, so we just reload to pull a different one next time
+  function skipSuggestion(){
+    loadSuggestions();
+  }
+
+  // Chat
+  function bootChat(){
+    const chatBox = document.getElementById("chatBox");
+    chatBox.innerHTML = "";
+  }
+
+  document.getElementById("chatForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const input = document.getElementById("chatInput");
+    const text = input.value.trim();
+    if (!text) return;
+    appendMsg("me", text);
+
+    try {
+  const res = await fetch(`${BACKEND_BASE}/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: USER_ID,
+      query: text
+    })
+  });
+  const data = await res.json();
+  appendMsg("bot", data?.answer || JSON.stringify(data));
+} catch (err) {
+  appendMsg("bot", "Sorry, I hit an error.");
+} finally {
+  input.value = "";
+}
+
+  });
+
+  function appendMsg(who, text) {
+  const box = document.getElementById("chatBox");
+  const wrap = document.createElement("div");
+  wrap.className = `msg ${who}`;
+
+  // This part correctly renders the message bubble
+  const html = renderMarkdown(text);
+  wrap.innerHTML = `<div class="bubble">${html}</div>`;
+  box.appendChild(wrap);
+  box.scrollTop = box.scrollHeight;
+
+  // This part correctly sends the message to the backend
+  if (who === 'user') {
+    const input = document.getElementById("chatInput");
+    input.value = ""; // Clear the input field
+    // Now, send the message to the backend
+    fetch(`${BACKEND_BASE}/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: USER_ID,
+        query: text
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      appendMsg("bot", data?.answer || JSON.stringify(data));
+    })
+    .catch(err => {
+      appendMsg("bot", "Sorry, I hit an error.");
+    });
+  }
+}
+
+// Basic Markdown renderer for bold, italics, and tables
+function renderMarkdown(md) {
+  // bold **text**
+  md = md.replace(/\*\*(.*?)\*\*/g, "<b>$1</b>");
+  // italics *text*
+  md = md.replace(/\*(.*?)\*/g, "<i>$1</i>");
+
+  // simple table support
+  if (md.includes("|")) {
+    const rows = md.trim().split("\n").filter(r => r.includes("|"));
+    if (rows.length > 1) {
+      let table = "<table border='1' cellspacing='0' cellpadding='5'>";
+      rows.forEach((r, i) => {
+        const cols = r.split("|").map(c => c.trim()).filter(c => c);
+        table += "<tr>" + cols.map(c => `<td>${c}</td>`).join("") + "</tr>";
+      });
+      table += "</table>";
+      return table;
+    }
+  }
+
+  return md;
+}
+
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
+  }
+
+  // Logout
+  document.getElementById("logoutBtn").addEventListener("click", ()=>{
+    clearSession();
+    location.reload();
+  });
+
+  // If a prior session exists, try status and go straight to app or onboarding
+  (async function boot(){
+    if (!USER_ID) return;
+    try {
+      const st = await fetch(`${BACKEND_BASE}/status?user_id=${encodeURIComponent(USER_ID)}`).then(r=>r.json());
+      if (st?.status === "profile_complete" || st?.status === "completed") {
+        show("authView", false);
+        show("appView", true);
+        initDashboard();
+      }
+    } catch { /* ignore */ }
+  })();
+</script>
+</body>
+</html>
