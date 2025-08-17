@@ -89,6 +89,30 @@ def get_answer_from_books(query: str, n_results: int = 5):
     
     return answer, context
 
+def generate_advisory_answer(full_prompt: str):
+    """
+    Sends a detailed, combined prompt to Mistral to get a synthesized advisory answer.
+    This is used for complex queries that require multiple data sources.
+    """
+    print("Sending comprehensive advisory prompt to Mistral AI...")
+    
+    messages = [
+        ChatMessage(role="user", content=full_prompt)
+    ]
+    
+    try:
+        chat_response = mistral_client.chat(
+            model="mistral-large-latest", # Use a powerful model for reasoning
+            messages=messages
+        )
+        answer = chat_response.choices[0].message.content
+        # For advisory answers, we don't return separate sources, as the answer is a synthesis of all of them.
+        return answer
+    except Exception as e:
+        print(f"Error during Mistral API call for advisory: {e}")
+        return "I'm sorry, I encountered an error while trying to generate a detailed advisory. Please try again."
+
+
 # --- 3. Main Interaction Loop (Kept for standalone testing) ---
 # CHANGE: The interactive loop is now inside an `if __name__ == "__main__":` block.
 # This means it will ONLY run if you execute this file directly (e.g., `python QNA.py`).

@@ -2,9 +2,35 @@
 import requests
 import pgeocode
 import re
+import os
+
+
+# Initialize geocoders for India
+geo_pincode = pgeocode.Nominatim('in')
+
+from dotenv import load_dotenv
+
 
 # Initialize the geocoder for India. It downloads data on first use.
 geo_pincode = pgeocode.Nominatim('in')
+
+def get_state_from_location(location_name: str):
+    """
+    Finds the state for a given Indian city or district name.
+    """
+    print(f"Looking up state for: {location_name}")
+    # pgeocode's query_location is good for this
+    location_info = geo_pincode.query_location(location_name)
+    if not location_info.empty and 'state_name' in location_info:
+        # It might return multiple matches, we'll take the first one
+        state = location_info['state_name'].iloc[0]
+        # Handle potential NaN values
+        if isinstance(state, str):
+            print(f"Found state: {state}")
+            return state
+    print(f"Could not determine state for {location_name}.")
+    return None
+
 
 def get_coords_for_location(location_query: str):
     """
@@ -114,3 +140,47 @@ def get_weather_forecast(location_query: str):
 
     except requests.exceptions.RequestException as e:
         return f"Error fetching weather data: {e}"
+    
+load_dotenv()
+AGMARKNET_API_KEY = os.getenv("AGMARKNET_API_KEY")
+
+def get_market_prices(district: str):
+    """
+    Fetches real-time commodity prices. It now automatically finds the state.
+    """
+    if not AGMARKNET_API_KEY:
+        return "Error: AGMARKNET_API_KEY is not configured."
+
+    # CHANGE: Dynamically find the state instead of hardcoding
+    state = get_state_from_location(district)
+    if not state:
+        return f"Could not determine the state for '{district}' to fetch market prices."
+
+    api_url = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
+    
+    params = {
+        "api-key": AGMARKNET_API_KEY,
+        "format": "json",
+        "limit": "20",
+        "filters[state]": state,
+        "filters[district]": district
+    }
+
+    try:
+        response = requests.get(api_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        if not data or 'records' not in data or not data['records']:
+            return f"No recent market price data found for {district}, {state}."
+
+        price_context = f"Recent commodity prices in {district}, {state}:\n"
+        for record in data['records']:
+            commodity = record.get('commodity', 'N/A')
+            modal_price = record.get('modal_price', 'N/A')
+            price_context += f"- {commodity}: Modal Price ₹{modal_price}/Quintal\n"
+        
+        return price_context.strip()
+
+    except requests.exceptions.RequestException as e:
+        return f"Error fetching market price data: {e}"
