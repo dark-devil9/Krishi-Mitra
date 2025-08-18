@@ -5,30 +5,75 @@
   <title>Krishi Mitra</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
   <style>
-    body { background:#f7faf8; }
+    :root {
+      --bg: linear-gradient(135deg, #e8f5e9 0%, #e3f2fd 50%, #f3e8ff 100%);
+      --glass: rgba(255,255,255,0.56);
+      --border: rgba(0,0,0,0.08);
+      --shadow: 0 10px 25px rgba(16,24,40,.08);
+      --brand: #16a34a;
+      --brand-ink: #0f5132;
+    }
+    body { background: var(--bg); font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'; }
     .app-shell { min-height: 100vh; }
-    .card { border-radius: 12px; }
-    .chat-box { height: 420px; overflow-y:auto; background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; }
-    .msg { margin-bottom:10px; }
-    .msg.me { text-align:right; }
-    .msg .bubble { display:inline-block; padding:8px 12px; border-radius:14px; max-width:80%; }
-    .msg.me .bubble { background:#dcfce7; }
-    .msg.bot .bubble { background:#eef2ff; }
+    .navbar-brand { font-weight: 700; letter-spacing:.2px; }
+    .brand-icon { width:28px; height:28px; border-radius:50%; display:inline-grid; place-items:center; background:#e8ffe8; color:var(--brand-ink); margin-right:8px; }
+    .glass { background: var(--glass); backdrop-filter: blur(10px); border:1px solid var(--border); box-shadow: var(--shadow); }
+    .card { border-radius: 14px; }
+    .panel-title { font-weight:600; letter-spacing:.2px; }
     .small-muted { font-size:12px; color:#6b7280; }
-    .panel-title { font-weight:600; }
     .split { display:grid; grid-template-columns: 1fr 1.4fr; gap:16px; }
     @media (max-width: 992px) { .split { grid-template-columns: 1fr; } }
+
+    /* Chat */
+    .chat-box { height: 470px; overflow-y:auto; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; box-shadow: var(--shadow); }
+    .msg { margin-bottom:12px; display:flex; gap:10px; align-items:flex-end; }
+    .msg.me { justify-content:flex-end; }
+    .avatar { width:32px; height:32px; border-radius:50%; display:grid; place-items:center; background:#eef2ff; color:#3730a3; font-size:16px; box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+    .msg.me .avatar { background:#dcfce7; color:#166534; }
+    .msg .bubble { padding:10px 12px; border-radius:14px; max-width:72%; line-height:1.45; box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+    .msg.me .bubble { background:#dcfce7; }
+    .msg.bot .bubble { background:#eef2ff; }
+    .bubble .btn { padding:3px 8px; font-size:12px; }
+    .chat-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .recording-dot { width:8px; height:8px; background:#ef4444; border-radius:50%; display:inline-block; margin-left:8px; box-shadow:0 0 0 0 rgba(239,68,68, .7); animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0% { box-shadow:0 0 0 0 rgba(239,68,68, .7);} 70% { box-shadow:0 0 0 12px rgba(239,68,68, 0);} 100% { box-shadow:0 0 0 0 rgba(239,68,68, 0);} }
+
+    /* Lists */
+    .list-clean > div { border:1px dashed #e5e7eb; border-radius:10px; padding:10px 12px; background:#fff; }
+    .list-clean > div .badge { font-weight:500; }
+    .suggestion-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:10px 12px; box-shadow: var(--shadow); }
   </style>
 </head>
 <body>
+<nav class="navbar navbar-expand-lg bg-white glass sticky-top">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center" href="#">
+      <span class="brand-icon"><i class="fa-solid fa-seedling"></i></span>
+      Krishi Mitra
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navBar" aria-controls="navBar" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navBar">
+      <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+        <li class="nav-item"><a class="nav-link" href="#appView">Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="#chatBox">Chat</a></li>
+        <li class="nav-item"><a class="nav-link" href="#alertsBox">Alerts</a></li>
+      </ul>
+    </div>
+  </div>
+  </nav>
+
 <div class="container py-4 app-shell">
-  <h2 class="mb-3 text-center">🌾 Krishi Mitra</h2>
+  <h2 class="mb-3 text-center visually-hidden">🌾 Krishi Mitra</h2>
 
   <!-- ================= AUTH (client-side) ================= -->
   <div id="authView" class="row justify-content-center">
     <div class="col-md-7">
-      <div class="card shadow-sm">
+      <div class="card shadow-sm glass">
         <div class="card-body">
           <h5 class="card-title mb-3">Login or Sign up</h5>
           <p class="small-muted mb-3">
@@ -56,7 +101,7 @@
   <!-- ================= ONBOARDING ================= -->
   <div id="onboardingView" class="row justify-content-center" style="display:none;">
     <div class="col-lg-9">
-      <div class="card shadow-sm">
+      <div class="card shadow-sm glass">
         <div class="card-body">
           <h5 class="card-title mb-3">Complete your profile</h5>
           <form id="onboardForm" class="row g-3">
@@ -126,15 +171,15 @@
     <div class="split">
       <!-- Left: Alerts + Suggestions -->
       <div>
-        <div class="card mb-3 shadow-sm">
+        <div class="card mb-3 shadow-sm glass">
           <div class="card-body">
             <div class="panel-title mb-2">Alerts</div>
-            <div id="alertsBox" class="vstack gap-2">
+            <div id="alertsBox" class="vstack gap-2 list-clean">
               <div class="text-muted">Loading alerts…</div>
             </div>
           </div>
         </div>
-        <div class="card shadow-sm">
+        <div class="card shadow-sm glass">
           <div class="card-body">
             <div class="panel-title mb-2">Suggestions</div>
             <div id="suggBox" class="vstack gap-2">
@@ -146,14 +191,16 @@
 
       <!-- Right: Chat -->
       <div>
-        <div class="card shadow-sm">
+        <div class="card shadow-sm glass">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-2">
               <div class="panel-title">Chatbot</div>
               <button id="logoutBtn" class="btn btn-outline-secondary btn-sm">Logout</button>
             </div>
             <div id="chatBox" class="chat-box mb-2"></div>
-            <form id="chatForm" class="d-flex gap-2">
+            <form id="chatForm" class="d-flex gap-2 align-items-center">
+              <button type="button" id="recBtn" class="btn btn-outline-secondary" title="Hold to record"><i class="fa-solid fa-microphone"></i></button>
+              <div id="recDot" class="small-muted" style="display:none;">Recording <span class="recording-dot"></span></div>
               <input id="chatInput" class="form-control" placeholder="Ask anything about agriculture…" />
               <button class="btn btn-primary">Send</button>
             </form>
@@ -163,6 +210,19 @@
       </div>
     </div>
   </div>
+
+  <footer class="mt-4">
+    <div class="card glass">
+      <div class="card-body d-flex justify-content-between align-items-center">
+        <div class="small-muted">© <span id="yr"></span> Krishi Mitra. All rights reserved.</div>
+        <div class="d-flex gap-3 small-muted">
+          <a href="#" class="text-decoration-none">Privacy</a>
+          <a href="#" class="text-decoration-none">Terms</a>
+          <a href="#" class="text-decoration-none">Contact</a>
+        </div>
+      </div>
+    </div>
+  </footer>
 
 </div>
 
@@ -309,8 +369,9 @@
       arr.forEach(a => {
         const card = document.createElement("div");
         card.className = "alert alert-warning";
-        const time = a.timestamp ? `<div class="small-muted">${new Date(a.timestamp).toLocaleString()}</div>` : "";
-        card.innerHTML = `<strong>${a.alert || a.title || "Alert"}</strong><br/>${a.suggestion || a.description || ""}${time}`;
+        const time = a.timestamp ? `<div class=\"small-muted\">${new Date(a.timestamp).toLocaleString()}</div>` : "";
+        const sugHtml = Array.isArray(a.suggestions) ? (`<ul class=\"mt-1 mb-1\">` + a.suggestions.map(s=>`<li>${escapeHtml(s.replace(/^SUGGESTION:\s*/i,''))}</li>`).join("") + `</ul>`) : (a.suggestion? `<div>${escapeHtml(a.suggestion)}</div>` : "");
+        card.innerHTML = `<strong>${escapeHtml((a.alert||'Alert').replace(/^ALERT:\s*/i,''))}</strong>${sugHtml}${time}`;
         box.appendChild(card);
       });
     } catch (e) {
@@ -371,6 +432,7 @@
   function bootChat(){
     const chatBox = document.getElementById("chatBox");
     chatBox.innerHTML = "";
+    initVoice();
   }
 
   document.getElementById("chatForm").addEventListener("submit", async (e)=>{
@@ -378,60 +440,132 @@
     const input = document.getElementById("chatInput");
     const text = input.value.trim();
     if (!text) return;
+    
+    // Clear input immediately to prevent double submission
+    input.value = "";
+    
+    // Add user message
     appendMsg("me", text);
 
     try {
-  const res = await fetch(`${BACKEND_BASE}/ask`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      user_id: USER_ID,
-      query: text
-    })
+      const res = await fetch(`${BACKEND_BASE}/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: USER_ID,
+          query: text
+        })
+      });
+      const data = await res.json();
+      const ans = data?.answer || JSON.stringify(data);
+      appendMsg("bot", ans);
+    } catch (err) {
+      console.error("Chat error:", err);
+      appendMsg("bot", "Sorry, I encountered an error. Please try again.");
+    }
   });
-  const data = await res.json();
-  appendMsg("bot", data?.answer || JSON.stringify(data));
-} catch (err) {
-  appendMsg("bot", "Sorry, I hit an error.");
-} finally {
-  input.value = "";
-}
 
-  });
+  // ====== Voice Recording, Whisper ASR, and TTS playback ======
+  let mediaRecorder;
+  let chunks = [];
+  let isRecording = false;
+
+  function initVoice(){
+    const recBtn = document.getElementById('recBtn');
+    const recDot = document.getElementById('recDot');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      recBtn.style.display = 'none';
+      return;
+    }
+
+    recBtn.addEventListener('mousedown', startRecording);
+    recBtn.addEventListener('touchstart', startRecording);
+    window.addEventListener('mouseup', stopRecording);
+    window.addEventListener('touchend', stopRecording);
+
+    async function startRecording(){
+      if (isRecording) return;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        chunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        mediaRecorder.onstop = onRecordingStop;
+        mediaRecorder.start();
+        isRecording = true;
+        recDot.style.display = '';
+      } catch (e) {
+        console.error('Mic error', e);
+      }
+    }
+
+    async function stopRecording(){
+      if (!isRecording) return;
+      isRecording = false;
+      recDot.style.display = 'none';
+      try { mediaRecorder.stop(); } catch {}
+    }
+
+    async function onRecordingStop(){
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      chunks = [];
+      const fd = new FormData();
+      fd.append('file', blob, 'audio.webm');
+      try {
+        const resp = await fetch(`${BACKEND_BASE}/voice/ask?user_id=${encodeURIComponent(USER_ID)}`, { method:'POST', body: fd });
+        const js = await resp.json();
+        const answer = js?.answer || 'No answer.';
+        appendMsg('bot', answer);
+        if (js?.audio_b64) {
+          const audio = new Audio('data:audio/mpeg;base64,' + js.audio_b64);
+          audio.play().catch(()=>{});
+        }
+      } catch (e) {
+        console.error('voice ask failed', e);
+        appendMsg('bot', 'Voice query failed. Please try again.');
+      }
+    }
+  }
 
   function appendMsg(who, text) {
-  const box = document.getElementById("chatBox");
-  const wrap = document.createElement("div");
-  wrap.className = `msg ${who}`;
+    const box = document.getElementById("chatBox");
+    const wrap = document.createElement("div");
+    wrap.className = `msg ${who}`;
 
-  // This part correctly renders the message bubble
-  const html = renderMarkdown(text);
-  wrap.innerHTML = `<div class="bubble">${html}</div>`;
-  box.appendChild(wrap);
-  box.scrollTop = box.scrollHeight;
-
-  // This part correctly sends the message to the backend
-  if (who === 'user') {
-    const input = document.getElementById("chatInput");
-    input.value = ""; // Clear the input field
-    // Now, send the message to the backend
-    fetch(`${BACKEND_BASE}/ask`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: USER_ID,
-        query: text
-      })
-    })
-    .then(res => res.json())
-    .then(data => {
-      appendMsg("bot", data?.answer || JSON.stringify(data));
-    })
-    .catch(err => {
-      appendMsg("bot", "Sorry, I hit an error.");
-    });
+    // Render the message bubble
+    const clean = sanitizeText(text);
+    const html = renderMarkdown(clean);
+    let avatar = who === 'bot' ? '<div class="avatar"><i class="fa-solid fa-robot"></i></div>' : '<div class="avatar"><i class="fa-solid fa-user"></i></div>';
+    let bubbleHtml = `${avatar}<div class="bubble">${html}`;
+    if (who === 'bot') {
+      // Add a play button for TTS on demand
+      const playId = crypto.randomUUID();
+      bubbleHtml += ` <button class="btn btn-sm btn-outline-secondary" style="margin-left:6px;" onclick="playTTS('${playId}')"><i class="fa-solid fa-volume-high"></i> Listen</button>`;
+      bubbleHtml += `<span id="aud_${playId}" style="display:none;"></span>`;
+    }
+    bubbleHtml += `</div>`;
+    wrap.innerHTML = bubbleHtml;
+    box.appendChild(wrap);
+    box.scrollTop = box.scrollHeight;
   }
-}
+
+  async function playTTS(id){
+    try {
+      // Find the last bot message text (simple approach: get its innerText without button label)
+      const bubbles = document.querySelectorAll('.msg.bot .bubble');
+      const last = bubbles[bubbles.length-1];
+      if (!last) return;
+      // Clean markdown-like symbols for smoother speech
+      let fullText = sanitizeText(last.innerText.replace('Listen','')).trim();
+      const resp = await fetch(`${BACKEND_BASE}/tts`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text: fullText, language: 'en' })});
+      const js = await resp.json();
+      if (js?.audio_b64) {
+        // Edge TTS returns MP3
+        const audio = new Audio('data:audio/mpeg;base64,' + js.audio_b64);
+        audio.play().catch(()=>{});
+      }
+    } catch(e){ /* ignore */ }
+  }
 
 // Basic Markdown renderer for bold, italics, and tables
 function renderMarkdown(md) {
@@ -458,6 +592,13 @@ function renderMarkdown(md) {
 }
 
 
+  // Remove asterisks, hashes and markdown-y symbols for display and TTS smoothness
+  function sanitizeText(s){
+    if (!s) return s;
+    return s.replace(/[\*#`>]/g, "");
+  }
+
+
   function escapeHtml(s){
     return s.replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
   }
@@ -479,6 +620,9 @@ function renderMarkdown(md) {
         initDashboard();
       }
     } catch { /* ignore */ }
+    // Footer year
+    const yEl = document.getElementById('yr');
+    if (yEl) yEl.textContent = new Date().getFullYear();
   })();
 </script>
 </body>
