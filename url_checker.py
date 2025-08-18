@@ -51,6 +51,50 @@ URLS_TO_CHECK = [
     "https://ndl.ethernet.edu.et/bitstream/123456789/88789/1/Agronomic%20Handbook.pdf",  # Agronomic handbook: major crops, soil classification
     "https://k8449r.weebly.com/uploads/3/0/7/3/30731055/principles-of-agronomy-agricultural-meteorology-signed.pdf",  # Principles of Agronomy & Agricultural Meteorology
     "https://www.researchgate.net/publication/222849119_Indian_Agriculture_and_climate_sensitivity",  # Indian Agriculture & Climate Sensitivity (ResearchGate)
+     "https://www.nafpo.in/wp-content/uploads/2019/05/farmer_friendly_handbook_for_schemes_programmes_2018_19_english.pdf",
+    "https://www.indiansugar.com/PDFS/GOVERNMENT_SCHEMES_FOR_AGRICULTURE__Revised-26.12.2019.pdf",
+    "https://compass.rauias.com/wp-content/uploads/2025/03/Raus-PRE-COMPASS-2025-GOVERNMENT-SCHEMES.pdf",
+    "https://transdev.assam.gov.in/sites/default/files/swf_utility_folder/departments/pndd_medhassu_in_oid_2/menu/document/compendium_of_govt._of_india_schemes_programmes.pdf",
+    "https://www.irjmets.com/uploadedfiles/paper/issue_1_january_2024/48523/final/fin_irjmets1705668095.pdf",
+
+
+    # Historical & Policy Perspectives
+    "https://www.icar.org.in/sites/default/files/2023-02/Indian-Agriculture-after-Independence.pdf",
+
+    # Sectoral / Ministry Guidelines
+    "https://www.dcmsme.gov.in/ebook/e-Book-28122020.pdf",  # MSME agro-processing schemes
+    "https://www.mofpi.gov.in/sites/default/files/SAMPADA_Guidelines.pdf",  # MOFPI SAMPADA scheme
+    "https://pmfby.gov.in/pmfbyweb/pdf/Operational_Guidelines.pdf",  # PM Fasal Bima Yojana Guidelines
+
+    # Biodiversity / Varieties
+    "https://www.plantauthority.gov.in/sites/default/files/2022-05/Compendium%20of%20Farmers%20Varieties.pdf",
+
+    # State & Regional Programs
+    "https://agri-horti.assam.gov.in/sites/default/files/swf_utility_folder/departments/agrih_assam_gov_in_oid_3/menu/document/movcdner_operational_guidelines.pdf",
+    "https://www.journeywithasr.com/2021/01/a-textbook-of-animal-husbandry-by-gc-banerjee.html",
+"https://www.scribd.com/document/589758177/ANIMAL-HUSBANDRY-E-BOOK",
+"https://www.vetextension.com/study-material-for-icar-jrf-srf-aieea-competitive-exams-animal-veterinary-sciences/",
+"https://www.agriexam.com/animal-husbandry-book-pdf",
+"https://www.journeywithasr.com/p/bvsc-and-ah-books-pdf.html",
+"https://archive.org/details/handbookofanimal0000vtsu",
+"https://icar.org.in/e-books",
+"https://www.manage.gov.in/publications/eBooks/Good%20Animal%20Husbandry%20and%20Veterinary%20Practices%20for%20Doubling%20of%20Farmers%E2%80%99%20Income.pdf",
+"https://www.vet-ebooks.com/textbook-of-animal-science/",
+"https://vetstudy.journeywithasr.com/2021/05/veterinary-books-pdf_2.html",
+"https://agrigyan.in/animal-husbandry-sknau-pdf/",
+"https://books.ebalbharati.in/pdfs/1203010511.pdf",
+"https://www.agrilcareer.com/wp-content/uploads/2020/01/DARYING-AH-handbook.pdf",
+"https://www.scribd.com/document/735961362/Textbook-of-Animal-Husbandry-by-G-C-Banerji-LPM-2",
+"https://ndpublisher.in/files/1687003729Contents(Textbook%20of%20Gen%20and%20Systemic%20Vet%20Med).pdf",
+"https://animalhusbandry.assam.gov.in/sites/default/files/swf_utility_folder/departments/ahvetdept_webcomindia_org_oid_3/portlet/level_1/files/veterinary_handbook_0.pdf",
+"https://basu.org.in/study-materials/",
+"https://www.drvet.in/p/e-books.html",
+"https://www.freebookcentre.net/medical_text_books_journals/Veterinary-Medicine-Books.html",
+"https://www.vet-ebooks.com/free-download/",
+"https://www.integratedpublications.in/publish-book-chapter/1557739183-current-research-in-animal-husbandry-and-veterinary-sciences",
+"https://epubs.icar.org.in/index.php/IJAnS",
+"https://byjus.com/free-ias-prep/important-books-animal-husbandry-veterinary-science-optional-upsc-ias-mains/",
+"https://books.google.co.in/books?id=kwslDwAAQBAJ&printsec=frontcover"
 
 ]
 
