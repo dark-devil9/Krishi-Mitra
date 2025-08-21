@@ -64,6 +64,26 @@
     body.dark .card { background: rgba(15,23,42,.6); }
     .btn-glass { background: rgba(255,255,255,.5); border:1px solid var(--border); }
     body.dark .btn-glass { background: rgba(255,255,255,.08); color:#e5e7eb; border-color: rgba(255,255,255,.06); }
+
+    /* Metrics */
+    .metrics-row .metric-card { border-radius:14px; border:1px solid var(--border); background:#fff; box-shadow: var(--shadow); padding:12px 14px; height:100%; }
+    .metrics-row .label { font-size:12px; color:#6b7280; display:flex; align-items:center; gap:6px; }
+    .metrics-row .value { font-weight:700; font-size:20px; margin-top:4px; }
+    .planner .mini { border:1px solid #e5e7eb; border-radius:10px; padding:8px; text-align:center; background:#fff; }
+    .planner .mini .k { font-size:12px; color:#64748b; }
+    .planner .mini .v { font-weight:700; margin-top:2px; }
+    /* Glossy metric icons */
+    .icon-gloss { width:28px; height:28px; display:inline-grid; place-items:center; border-radius:999px; border:1px solid rgba(0,0,0,.06); background: radial-gradient(circle at 30% 20%, #fff 0%, #f0f9ff 40%, #dbeafe 100%); box-shadow: inset 0 1px 1px rgba(255,255,255,.65), 0 4px 10px rgba(16,24,40,.12); color:#1d4ed8; }
+    .icon-temp { background: radial-gradient(circle at 30% 20%, #fff 0%, #fee2e2 40%, #fecaca 100%); color:#dc2626; }
+    .icon-rain { background: radial-gradient(circle at 30% 20%, #fff 0%, #e0f2fe 40%, #bae6fd 100%); color:#0284c7; }
+    .icon-wind { background: radial-gradient(circle at 30% 20%, #fff 0%, #e5e7eb 40%, #e2e8f0 100%); color:#334155; }
+    .icon-rh { background: radial-gradient(circle at 30% 20%, #fff 0%, #e0f2fe 40%, #bae6fd 100%); color:#0369a1; }
+    /* Illustration container */
+    .illustration { height:220px; display:flex; align-items:center; justify-content:center; background: radial-gradient(circle at 20% 0%, rgba(34,197,94,.12), transparent 60%), radial-gradient(circle at 80% 0%, rgba(59,130,246,.12), transparent 60%); }
+    /* Dark mode refinements */
+    body.dark { background: radial-gradient(circle at 20% -10%, #0b1220 0%, #0b1020 35%, #0a0f1c 100%); color:#e5e7eb; }
+    body.dark .metrics-row .metric-card { background: rgba(17,24,39,.6); border-color: rgba(255,255,255,.06); box-shadow: 0 10px 24px rgba(0,0,0,.35); }
+    body.dark .icon-gloss { box-shadow: inset 0 1px 1px rgba(255,255,255,.18), 0 4px 10px rgba(0,0,0,.35); border-color: rgba(255,255,255,.08); }
   </style>
 </head>
 <body>
@@ -205,6 +225,120 @@
 
   <!-- ================= DASHBOARD ================= -->
   <div id="appView" style="display:none;">
+    <!-- Top metrics and crop planner -->
+    <div class="row g-3 align-items-stretch mb-3 metrics-row">
+      <div class="col-lg-9">
+        <div class="row g-3">
+          <div class="col-6 col-md-3">
+            <div class="metric-card">
+              <div class="label"><span class="icon-gloss icon-temp"><i class="fa-solid fa-temperature-half"></i></span> Temperature</div>
+              <div class="value" id="m_temp">--</div>
+              <div class="small-muted">today</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="metric-card">
+              <div class="label"><span class="icon-gloss icon-rh"><i class="fa-solid fa-droplet"></i></span> Humidity</div>
+              <div class="value" id="m_humidity">--</div>
+              <div class="small-muted">avg</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="metric-card">
+              <div class="label"><span class="icon-gloss icon-rain"><i class="fa-solid fa-cloud-rain"></i></span> Rain</div>
+              <div class="value" id="m_rain">--</div>
+              <div class="small-muted">chance</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="metric-card">
+              <div class="label"><span class="icon-gloss icon-wind"><i class="fa-solid fa-wind"></i></span> Wind</div>
+              <div class="value" id="m_wind">--</div>
+              <div class="small-muted">max</div>
+            </div>
+          </div>
+        </div>
+        <div class="card shadow-sm glass mt-3 illustration">
+          <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="sky" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#c7e8ff"/>
+                <stop offset="100%" stop-color="#e6f7ff"/>
+              </linearGradient>
+              <linearGradient id="field" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%" stop-color="#bbf7d0"/>
+                <stop offset="100%" stop-color="#86efac"/>
+              </linearGradient>
+              <linearGradient id="rows" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#22c55e"/>
+                <stop offset="100%" stop-color="#15803d"/>
+              </linearGradient>
+            </defs>
+            <!-- Sky -->
+            <rect x="0" y="0" width="720" height="180" fill="url(#sky)"/>
+            <!-- Sun -->
+            <circle cx="90" cy="70" r="28" fill="#fde047"/>
+            <!-- Clouds -->
+            <g fill="#fff" opacity=".9">
+              <ellipse cx="210" cy="60" rx="38" ry="18"/>
+              <ellipse cx="240" cy="60" rx="22" ry="12"/>
+              <ellipse cx="188" cy="60" rx="22" ry="12"/>
+              <ellipse cx="520" cy="50" rx="34" ry="16"/>
+              <ellipse cx="548" cy="50" rx="18" ry="10"/>
+              <ellipse cx="496" cy="52" rx="18" ry="10"/>
+            </g>
+            <!-- Hills -->
+            <path d="M0 150 C120 110 200 140 300 120 C420 95 540 150 720 120 L720 180 L0 180 Z" fill="#a7f3d0"/>
+            <!-- Field base -->
+            <rect x="0" y="180" width="720" height="80" fill="url(#field)"/>
+            <!-- Crop rows -->
+            <g stroke="url(#rows)" stroke-width="6" opacity=".8">
+              <path d="M0 190 C120 170 240 210 360 190 C480 170 600 210 720 190" fill="none"/>
+              <path d="M0 208 C120 188 240 228 360 208 C480 188 600 228 720 208" fill="none"/>
+              <path d="M0 226 C120 206 240 246 360 226 C480 206 600 246 720 226" fill="none"/>
+            </g>
+            <!-- Simple tractor -->
+            <g transform="translate(470,190)">
+              <rect x="-24" y="-18" width="50" height="20" rx="4" fill="#2563eb"/>
+              <rect x="-8" y="-34" width="18" height="16" rx="2" fill="#93c5fd"/>
+              <circle cx="-14" cy="6" r="10" fill="#111827"/>
+              <circle cx="22" cy="6" r="14" fill="#111827"/>
+              <circle cx="-14" cy="6" r="4" fill="#e5e7eb"/>
+              <circle cx="22" cy="6" r="6" fill="#e5e7eb"/>
+            </g>
+            <!-- Trees -->
+            <g transform="translate(120,168)">
+              <rect x="-2" y="0" width="4" height="16" fill="#065f46"/>
+              <circle cx="0" cy="-6" r="10" fill="#10b981"/>
+            </g>
+            <g transform="translate(620,172)">
+              <rect x="-2" y="0" width="4" height="16" fill="#065f46"/>
+              <circle cx="0" cy="-6" r="10" fill="#10b981"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="col-lg-3">
+        <div class="d-flex gap-2 mb-2">
+          <input id="locInput" class="form-control" placeholder="Set your location (city/pincode)" />
+          <button id="refreshWeather" class="btn btn-outline-primary">Refresh</button>
+        </div>
+        <div class="card shadow-sm glass planner">
+          <div class="card-body">
+            <div class="small-muted">Crop planner</div>
+            <div class="h6" id="plannerCrop">Wheat</div>
+            <div class="small-muted mb-2">Use next 24h weather to plan spraying and irrigation.</div>
+            <div class="d-flex gap-2 mb-3">
+              <div class="mini flex-fill"><div class="k">Temp</div><div class="v" id="p_temp">--</div></div>
+              <div class="mini flex-fill"><div class="k">Rain</div><div class="v" id="p_rain">--</div></div>
+              <div class="mini flex-fill"><div class="k">RH</div><div class="v" id="p_rh">--</div></div>
+            </div>
+            <button id="plantBtn" class="btn btn-success w-100">Plant</button>
+            <div id="plantResult" class="small-muted mt-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="split">
       <!-- Left: Alerts + Suggestions -->
       <div>
@@ -297,6 +431,7 @@
   if (toggleBtn) {
     toggleBtn.addEventListener('click', ()=>{
       document.body.classList.toggle('dark');
+      try { localStorage.setItem('km_theme', document.body.classList.contains('dark') ? 'dark' : 'light'); } catch {}
     });
   }
 
@@ -349,6 +484,9 @@
         body: JSON.stringify({ message: fullLocation })
       });
 
+      // Save a local hint for weather widgets
+      try { localStorage.setItem('km_location_hint', fullLocation); } catch {}
+
       // 3) Land size
       await fetch(`${BACKEND_BASE}/chat?user_id=${encodeURIComponent(USER_ID)}`, {
         method:"POST", headers:{ "Content-Type":"application/json" },
@@ -397,9 +535,14 @@
 
   // ================== DASHBOARD ==================
   async function initDashboard(){
+    // Seed location input from saved hint
+    const hint = localStorage.getItem('km_location_hint');
+    const li = document.getElementById('locInput');
+    if (li && hint) li.value = hint;
     loadAlerts();
     loadSuggestions();
     bootChat();
+    updateWeatherUI();
   }
 
   // Alerts
@@ -513,6 +656,56 @@
     const chatBox = document.getElementById("chatBox");
     chatBox.innerHTML = "";
     initVoice();
+  }
+
+  // ====== Weather metrics ======
+  function getSavedLocation(){
+    const i = document.getElementById('locInput');
+    let loc = (i && i.value.trim()) || localStorage.getItem('km_location_hint') || '';
+    return loc || 'Jaipur';
+  }
+
+  async function updateWeatherUI(){
+    const loc = getSavedLocation();
+    try {
+      const qs = `?user_id=${encodeURIComponent(USER_ID)}&location=${encodeURIComponent(loc)}`;
+      const r = await fetch(`${BACKEND_BASE}/weather_summary${qs}`);
+      const js = await r.json();
+      const tmin = js.tmin, tmax = js.tmax, hum = js.humidity, rp = js.rain_probability, wind = js.wind_max_kmh;
+      document.getElementById('m_temp').textContent = (tmin!=null && tmax!=null) ? `${tmin}°C to ${tmax}°C` : '--';
+      document.getElementById('m_humidity').textContent = hum!=null ? `${hum}%` : '--';
+      document.getElementById('m_rain').textContent = rp!=null ? `${rp}%` : '--';
+      document.getElementById('m_wind').textContent = wind!=null ? `${wind} km/h` : '--';
+      document.getElementById('p_temp').textContent = (tmin!=null && tmax!=null) ? `${tmin}°C–${tmax}°C` : '--';
+      document.getElementById('p_rain').textContent = rp!=null ? `${rp}%` : '--';
+      document.getElementById('p_rh').textContent = hum!=null ? `${hum}%` : '--';
+    } catch(e){ /* ignore */ }
+  }
+
+  const refreshBtn = document.getElementById('refreshWeather');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', ()=>{
+      const i = document.getElementById('locInput');
+      if (i) localStorage.setItem('km_location_hint', i.value.trim());
+      updateWeatherUI();
+    });
+  }
+
+  // Plant button wiring
+  const plantBtn = document.getElementById('plantBtn');
+  if (plantBtn) {
+    plantBtn.addEventListener('click', async ()=>{
+      const resBox = document.getElementById('plantResult');
+      resBox.textContent = 'Checking conditions…';
+      const crop = document.getElementById('plannerCrop')?.textContent || 'crop';
+      const loc = getSavedLocation();
+      try {
+        const resp = await fetch(`${BACKEND_BASE}/plan/plant`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ crop, user_id: USER_ID, location: loc }) });
+        const js = await resp.json();
+        const badge = js?.decision === 'Plant' ? '✅' : '⏳';
+        resBox.textContent = `${badge} ${js?.decision || 'Wait'} — ${js?.reason || ''}`;
+      } catch(e){ resBox.textContent = 'Could not fetch decision.'; }
+    });
   }
 
   document.getElementById("chatForm").addEventListener("submit", async (e)=>{
@@ -738,6 +931,8 @@ function renderMarkdown(md) {
   // If a prior session exists, try status and go straight to app or onboarding
   (async function boot(){
     if (!USER_ID) return;
+    // restore theme
+    try { if (localStorage.getItem('km_theme') === 'dark') document.body.classList.add('dark'); } catch {}
     try {
       const st = await fetch(`${BACKEND_BASE}/status?user_id=${encodeURIComponent(USER_ID)}`).then(r=>r.json());
       if (st?.status === "profile_complete" || st?.status === "completed") {

@@ -20,7 +20,7 @@ from rapidfuzz import fuzz
 
 # --- Import Core Logic ---
 try:
-    from data_sources import get_weather_forecast, get_market_prices, get_weather_brief, get_price_quote, compare_market_prices, get_price_trend, agmark_qna_answer
+    from data_sources import get_weather_forecast, get_market_prices, get_weather_brief, get_price_quote, compare_market_prices, get_price_trend, agmark_qna_answer, get_coords_for_location
     from qna import get_answer_from_books, generate_advisory_answer
     from ner_utils import extract_location_from_query
     from translator import detect_language, translate_text, transliterate_to_latin, is_latin_script
@@ -519,19 +519,23 @@ async def ask_question(request: AskRequest):
     if intent == "weather":
         place = place_mention or profile.get("location") or "Jaipur"
         print(f"Fetching weather for: {place}")
-        
-        # Check if it's a specific weather metric query
-        if any(word in query.lower() for word in ['rain', 'rainfall']):
-            weather_info = get_weather_brief(place)
-            if "High chance of rain" in weather_info:
-                weather_info += "\n\n💡 Smart Action: Consider delaying field operations, protect harvested crops, and check drainage."
-            return {"answer": weather_info}
-        elif any(word in query.lower() for word in ['humidity', 'wind', 'frost', 'heat']):
-            weather_info = get_weather_brief(place)
-            return {"answer": weather_info}
-        else:
-            weather_info = get_weather_brief(place)
-            return {"answer": weather_info}
+        # Fetch compact, structured forecast context (no hardcoded replies)
+        context = get_weather_forecast(place)
+        prompt = (
+            "You are a concise weather assistant for farmers.\n"
+            "Use ONLY the provided weather data context to answer the user's exact question.\n"
+            "Rules:\n"
+            "- If asked 'will it rain tomorrow', answer Yes/No with probability if present.\n"
+            "- If asked for a metric (humidity, wind, temperature), reply with just the number and unit if known.\n"
+            "- Mention the day (today/tomorrow) only if needed.\n"
+            "- Do NOT add extra details or tips.\n"
+            "- If the data does not include the requested value, say 'Data not available'.\n\n"
+            f"Weather data context:\n{context}\n\n"
+            f"Question: {query}\n"
+            "Answer succinctly in one or two sentences maximum."
+        )
+        ans = generate_advisory_answer(prompt)
+        return {"answer": ans}
 
     # Handle market/price queries intelligently
     if intent == "market":
@@ -624,6 +628,75 @@ async def ask_question(request: AskRequest):
     """
     answer, _ = get_answer_from_books(contextual_prompt)
     return {"answer": answer}
+
+# --- Crop Planting Decision ---
+class PlantDecisionRequest(BaseModel):
+    crop: str | None = None
+    user_id: str | None = None
+    location: str | None = None
+
+@app.post("/plan/plant", summary="Return a go/no-go planting decision based on next-day weather")
+async def plant_decision(req: PlantDecisionRequest):
+    profile = user_profiles.get(req.user_id or "", {})
+    place = req.location or profile.get("location") or "Jaipur"
+    context = get_weather_forecast(place)
+    crop = (req.crop or profile.get("current_crops") or "crop").strip()
+    prompt = (
+        "You are an agronomy assistant. Using ONLY the weather context below, decide if it is suitable to PLANT the specified crop in the next 24-48 hours.\n"
+        "Reply in strict JSON with keys: decision ('Plant'|'Wait'), reason (<=140 chars).\n"
+        f"Crop: {crop}\nLocation: {place}\n\nWeather Context:\n{context}\n\nJSON:"
+    )
+    text = generate_advisory_answer(prompt)
+    try:
+        import json as _json
+        js = _json.loads(text)
+        decision = js.get("decision") or "Wait"
+        reason = js.get("reason") or "Insufficient data."
+        return {"decision": decision, "reason": reason}
+    except Exception:
+        return {"decision": "Wait", "reason": "Could not parse decision."}
+
+# --- Weather Summary for Dashboard ---
+@app.get("/weather_summary", summary="Get compact weather metrics for dashboard")
+async def weather_summary(user_id: str | None = None, location: str | None = None):
+    """Return today's compact weather metrics for a location.
+    Prefers explicit location, else user's profile location, else Jaipur.
+    """
+    try:
+        place = (location or (user_profiles.get(user_id or "", {}).get("location") if user_id else None) or "Jaipur")
+        coords = get_coords_for_location(place)
+        if not coords:
+            raise HTTPException(status_code=400, detail="Could not resolve location")
+        lat, lon = coords["lat"], coords["lon"]
+        import requests
+        api = "https://api.open-meteo.com/v1/forecast"
+        daily = (
+            "precipitation_sum,precipitation_probability_max,temperature_2m_max,"
+            "temperature_2m_min,relative_humidity_2m_mean,windspeed_10m_max"
+        )
+        r = requests.get(f"{api}?latitude={lat}&longitude={lon}&daily={daily}&timezone=Asia/Kolkata", timeout=12)
+        r.raise_for_status()
+        d = r.json().get("daily", {})
+        idx = 0  # today
+        def gv(key: str):
+            arr = d.get(key) or []
+            return arr[idx] if len(arr) > idx else None
+        res = {
+            "location": place,
+            "date": (d.get("time") or [None])[idx] if d.get("time") else None,
+            "tmin": gv("temperature_2m_min"),
+            "tmax": gv("temperature_2m_max"),
+            "humidity": gv("relative_humidity_2m_mean"),
+            "rain_probability": gv("precipitation_probability_max"),
+            "rain_sum_mm": gv("precipitation_sum"),
+            "wind_max_kmh": gv("windspeed_10m_max"),
+        }
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"weather_summary failed: {e}")
+        raise HTTPException(status_code=500, detail="Weather summary failed")
 
 # ================== Voice Support Endpoints ==================
 

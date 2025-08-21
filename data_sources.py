@@ -15,6 +15,7 @@ geo_pincode = pgeocode.Nominatim('in')
 from dotenv import load_dotenv
 import json
 from qna import run_llm_json, run_llm_text
+from ner_utils import extract_location_from_query as _ner_extract_location
 
 
 # Initialize the geocoder for India. It downloads data on first use.
@@ -254,35 +255,43 @@ def get_weather_forecast(location_query: str):
         response.raise_for_status()
         data = response.json()
         
-        # --- Format all the data into a clean, agricultural-focused context string ---
+        # --- Format a clean context for both today and tomorrow ---
         daily_data = data['daily']
-        
-        # Extract data for tomorrow (index 1)
-        forecast_date = daily_data['time'][1]
-        max_temp = daily_data['temperature_2m_max'][1]
-        min_temp = daily_data['temperature_2m_min'][1]
-        humidity = daily_data['relative_humidity_2m_mean'][1]
-        precip_total = daily_data['precipitation_sum'][1]
-        precip_prob = daily_data['precipitation_probability_max'][1]
-        wind_speed = daily_data['windspeed_10m_max'][1]
-        solar_radiation = daily_data['shortwave_radiation_sum'][1]
-        evapotranspiration = daily_data['et0_fao_evapotranspiration'][1]
-        soil_temp = daily_data['soil_temperature_0_to_7cm_mean'][1]
-        soil_moisture = daily_data['soil_moisture_0_to_7cm_mean'][1]
 
-        # CHANGE: Build a more detailed, farmer-centric context string.
-        context_string = f"""
-        Agricultural Weather Forecast for {location_query} on {forecast_date}:
-        - Air Temperature: Max {max_temp}°C, Min {min_temp}°C.
-        - Humidity: The average relative humidity will be {humidity}%.
-        - Precipitation: Total of {precip_total}mm expected, with a {precip_prob}% maximum probability of rain.
-        - Soil Conditions: Average soil temperature at the top layer (0-7cm) will be {soil_temp}°C. Average soil moisture will be {soil_moisture} m³/m³.
-        - Wind: Maximum speed of {wind_speed} km/h.
-        - Sunlight: Total solar radiation will be {solar_radiation} MJ/m².
-        - Water Loss: Estimated crop water loss (Evapotranspiration ET₀) will be {evapotranspiration} mm.
-        """
-        
-        # This detailed context will be passed to the LLM.
+        def lines_for(idx: int) -> list[str]:
+            try:
+                date_str = daily_data['time'][idx]
+                max_temp = daily_data['temperature_2m_max'][idx]
+                min_temp = daily_data['temperature_2m_min'][idx]
+                humidity = daily_data['relative_humidity_2m_mean'][idx]
+                precip_total = daily_data['precipitation_sum'][idx]
+                precip_prob = daily_data['precipitation_probability_max'][idx]
+                wind_speed = daily_data['windspeed_10m_max'][idx]
+                solar_radiation = daily_data['shortwave_radiation_sum'][idx]
+                evapotranspiration = daily_data['et0_fao_evapotranspiration'][idx]
+                soil_temp = daily_data['soil_temperature_0_to_7cm_mean'][idx]
+                soil_moisture = daily_data['soil_moisture_0_to_7cm_mean'][idx]
+            except Exception:
+                return []
+            day_label = "today" if idx == 0 else ("tomorrow" if idx == 1 else date_str)
+            return [
+                f"Day: {day_label} ({date_str})",
+                f"Temp: {min_temp}°C to {max_temp}°C",
+                f"Humidity: {humidity}%",
+                f"Rain: {precip_total}mm total; {precip_prob}% probability",
+                f"Wind: {wind_speed} km/h",
+                f"Sunlight: {solar_radiation} MJ/m²",
+                f"ET0: {evapotranspiration} mm",
+                f"Soil: temp {soil_temp}°C; moisture {soil_moisture} m³/m³",
+            ]
+
+        today_lines = lines_for(0)
+        tomo_lines = lines_for(1)
+        context_string = (
+            f"Agricultural Weather Forecast for {location_query}:\n" +
+            ("\n".join(today_lines) + "\n" if today_lines else "") +
+            ("\n".join(tomo_lines) if tomo_lines else "")
+        )
         return context_string.strip()
 
     except requests.exceptions.RequestException as e:
@@ -437,6 +446,9 @@ def _fetch_recent_records(api_key: str, state: str, recent_days: int = 14,
     }
     if commodity_exact:
         base_params["filters[commodity]"] = commodity_exact
+    # When district hint is known, pass it to API to restrict results (prevents cross-state/market leakage)
+    if district_hint:
+        base_params["filters[district]"] = district_hint
     try:
         r = requests.get(f"{AGMARK_API}/{AGMARK_RESOURCE}", params=base_params, timeout=18)
         r.raise_for_status()
@@ -446,9 +458,10 @@ def _fetch_recent_records(api_key: str, state: str, recent_days: int = 14,
         cutoff = datetime.now() - timedelta(days=recent_days)
         recs = [x for x in recs if _parse_date(x.get("arrival_date", "01/01/1900")) >= cutoff]
         if district_hint:
-            prefer = [x for x in recs if (x.get("district") or "").strip().lower() == district_hint.strip().lower()]
-            if prefer:
-                recs = prefer
+            # Keep only matching district records when available
+            filtered = [x for x in recs if (x.get("district") or "").strip().lower() == district_hint.strip().lower()]
+            if filtered:
+                recs = filtered
         # sort latest first
         recs.sort(key=lambda x: _parse_date(x.get("arrival_date", "01/01/1900")), reverse=True)
         return recs
@@ -493,6 +506,25 @@ def get_price_quote(place_text: str, api_key: str, commodity_text: str | None, r
     # pick the most recent record
     rec = recs[0]
     market = (rec.get("market") or "N/A").strip()
+    # Safety: ensure the selected record belongs to same state and, if available, same district
+    rec_state = (rec.get("state") or "").strip()
+    rec_district = (rec.get("district") or "").strip()
+    if state and rec_state and rec_state.lower() != state.lower():
+        # Try to fall back to a record within the correct state
+        for r in recs:
+            if (r.get("state") or "").strip().lower() == state.lower():
+                rec = r
+                market = (rec.get("market") or "N/A").strip()
+                rec_district = (rec.get("district") or "").strip()
+                break
+    if district_hint and rec_district and rec_district.lower() != district_hint.lower():
+        # Prefer a record with matching district if available
+        for r in recs:
+            if (r.get("district") or "").strip().lower() == district_hint.lower():
+                rec = r
+                market = (rec.get("market") or "N/A").strip()
+                rec_district = (rec.get("district") or "").strip()
+                break
     modal_price_qtl = None
     try:
         modal_price_qtl = float(rec.get("modal_price"))
@@ -558,7 +590,9 @@ def compare_market_prices(place_text: str, api_key: str, commodity_text: str | N
         if cand:
             comm_norm = cand[0]
 
-    recs = _fetch_recent_records(api_key, state, recent_days, commodity_exact=comm_norm)
+    loc2 = get_state_and_district(place_text)
+    district_hint = loc2.get("district")
+    recs = _fetch_recent_records(api_key, state, recent_days, commodity_exact=comm_norm, district_hint=district_hint)
     if not recs:
         return f"No recent market data available for {comm_norm or (commodity_text or 'the commodity')} in {state}."
 
@@ -572,6 +606,9 @@ def compare_market_prices(place_text: str, api_key: str, commodity_text: str | N
             price = float(r.get("modal_price"))
         except Exception:
                     continue
+        # Only accumulate markets from the correct state
+        if (r.get("state") or "").strip().lower() != state.strip().lower():
+            continue
         if mkt and (mkt not in market_to_date or dt > market_to_date[mkt]):
             market_to_price_qtl[mkt] = price
             market_to_date[mkt] = dt
@@ -647,6 +684,9 @@ def get_price_trend(place_text: str, api_key: str, commodity_text: str | None,
     series = []
     for r in recs:
         try:
+            # Ensure state matches to avoid cross-state artefacts
+            if (r.get("state") or "").strip().lower() != state.strip().lower():
+                continue
             dt = _parse_date(r.get("arrival_date", "01/01/1900"))
             price = float(r.get("modal_price"))
         except Exception:
@@ -809,9 +849,16 @@ def agmark_qna_answer(user_query: str, user_profile: dict | None = None) -> str:
     quantity_unit = parsed.get("quantity_unit")
     date_or_range = parsed.get("date_or_range")
 
-    # Fallbacks from profile for location
+    # Fallbacks for location: profile, then NER extraction from query
     if not location_raw and user_profile:
         location_raw = user_profile.get("location")
+    if not location_raw:
+        try:
+            guess = _ner_extract_location(user_query)
+            if guess:
+                location_raw = guess
+        except Exception:
+            pass
 
     commodity_name, resolved_variety = _resolve_commodity_and_variety(raw_comm)
     if variety is None:
